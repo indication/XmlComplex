@@ -2,41 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Xml;
-namespace CombineAppConfig
+namespace XmlComplex
 {
-    class Program
+    class XmlComplexer
     {
-        /// <summary>
-        /// ConsoleApplication.exe ExportTargetFileName.xml BaseFileName.xml ExtendFilename.xml...
-        /// </summary>
-        /// <param name="args"></param>
-        /// <returns></returns>
-        static int Main(string[] args)
+
+        public XmlDocument Combine(List<string> _items, string _baseFile)
         {
-            var _items = new List<string>();
-            _items.AddRange(args);
-            if (_items.Count < 2)
-                return -1;
-            bool findAll = true;
-            var _exportFile = _items[0];
-            _items.RemoveAt(0);
-            foreach (var _item in _items)
-            {
-                if (!File.Exists(_item))
-                {
-                    Console.WriteLine(string.Format("{0} is not Found.", _item));
-                    findAll = false;
-                }
-            }
-            if (!findAll)
-            {
-                return -1;
-            }
-
-            var _baseFile = _items[0];
-            _items.RemoveAt(0);
-
-            XmlDocument _basedoc = new XmlDocument();
+            var  _basedoc = new XmlDocument();
             _basedoc.Load(_baseFile);
 
             foreach (var _item in _items)
@@ -45,14 +18,16 @@ namespace CombineAppConfig
                 _xml.Load(_item);
                 proc(_basedoc.ChildNodes[1] as XmlElement, _xml.ChildNodes[1] as XmlElement);
             }
-            
-            //_basedoc.Save(_baseFile + "2.xml");
-            //Console.Write(_basedoc.OuterXml);
-            //Console.Read();
-            return 0;
+            return _basedoc;
         }
 
-        static void proc(XmlElement basedata, XmlElement importdata)
+        public void Combine(List<string> _items, string _baseFile, string _exportFile)
+        {
+            var _basedoc = Combine(_items, _baseFile);
+            _basedoc.Save(_exportFile);
+        }
+
+        void proc(XmlElement basedata, XmlElement importdata)
         {
             if (basedata == null || importdata == null)
             {
