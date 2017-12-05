@@ -30,7 +30,6 @@ namespace XmlComplex
             }
             return _basedoc;
         }
-
         /// <summary>
         /// Combine xml document
         /// </summary>
@@ -61,6 +60,7 @@ namespace XmlComplex
                 
                 if (!sameelement.Any())
                     basedata.InnerXml += element.OuterXml;
+
             }
         }
         /// <summary>

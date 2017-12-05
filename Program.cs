@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Xml;
 
 namespace XmlComplex
 {
@@ -21,6 +22,8 @@ namespace XmlComplex
                 new [] { "n", "newline" },
                 new [] { "es", "encodings" },
                 new [] { "e", "encoding" },
+                new [] { "i-", "no-indent" },
+                new [] { "i", "indent" },
                 new [] { "v", "version" },
                 new [] { "h", "help" },
             });
@@ -110,6 +113,11 @@ namespace XmlComplex
                 Console.WriteLine("\t\tOutput encoding. default: utf8 (without BOM)");
                 Console.WriteLine("\t\tUTF-8BOM/UTF-16BOM/UTF-16BEBOM/UTF-32BOM/UTF-32BEBOM is supported.");
                 Console.WriteLine();
+                Console.WriteLine("\t-i=INDENTCHAR [--indent=INDENTCHAR]");
+                Console.WriteLine("\t\tOutput with indednt. default:    (double space)");
+                Console.WriteLine("\t-i- [--no-indent]");
+                Console.WriteLine("\t\tOutput with no indent");
+                Console.WriteLine();
                 Console.WriteLine("\t-n=LINECODE [--newline=LINECODE]");
                 Console.WriteLine("\t\tOutput line break charactor(s). default: CRLF");
                 Console.WriteLine("\t\tLINECODE: {0}", string.Join("|", Enum.GetNames(typeof(NewLineKind))));
@@ -137,10 +145,14 @@ namespace XmlComplex
             var _basedoc = _ex.Combine(_items.First(), _items.Skip(1).ToArray());
             if (options.ContainsKey("encoding"))
             {
-                using (var stream = new StreamWriter(options["output"], false, encode))
+                var settings = new XmlWriterSettings();
+                settings.Encoding = encode;
+                settings.Indent = !options.ContainsKey("no-indent");
+                settings.IndentChars = options.ContainsKey("indent") ? options["indent"] : "  ";
+                if (newline != null)
+                    settings.NewLineChars = newline;
+                using (var stream = XmlWriter.Create(options["output"], settings))
                 {
-                    if (newline != null)
-                        stream.NewLine = newline;
                     _basedoc.Save(stream);
                 }
             }
