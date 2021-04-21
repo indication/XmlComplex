@@ -118,22 +118,22 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <data name="ErrorFileNotFound" xml:space="preserve">
-    <value>{0} is not Found.</value>
+    <value>{0} が見つかりません。</value>
     <comment>0:filename</comment>
   </data>
   <data name="ErrorInvalidEncoding" xml:space="preserve">
-    <value>Encoding {0} is invalid: {1}</value>
+    <value>エンコード({0})の指定が不正です: {1}</value>
     <comment>0:input data, 1:exception message</comment>
   </data>
   <data name="ErrorInvalidLineCode" xml:space="preserve">
-    <value>Line code is invalid: {0}</value>
+    <value>改行コードの指定が不正です: {0}</value>
     <comment>0:input data</comment>
   </data>
   <data name="HelpEncoding" xml:space="preserve">
-    <value>Supported encodings:</value>
+    <value>対応しているエンコード:</value>
   </data>
   <data name="HelpEncodingExt" xml:space="preserve">
-    <value>UTF-8BOM/UTF-16BOM/UTF-16BEBOM/UTF-32BOM/UTF-32BEBOM is supported.</value>
+    <value>UTF-8BOM/UTF-16BOM/UTF-16BEBOM/UTF-32BOM/UTF-32BEBOM も指定可能です。</value>
   </data>
   <data name="HelpMessage" xml:space="preserve">
     <value>{0} -o=exportfile.xml inputfile1.xml inputfile2.xml
@@ -141,39 +141,40 @@ Options: </value>
     <comment>0:filename, 1:Encoding Description, 2:NewLineKind</comment>
   </data>
   <data name="HelpOptionsEncoding" xml:space="preserve">
-    <value>Output encoding. default: utf8 (without BOM)</value>
+    <value>出力エンコード。既定: utf8 (BOMなし)</value>
   </data>
   <data name="HelpOptionsEncodings" xml:space="preserve">
-    <value>Show supported encodings.</value>
+    <value>対応しているエンコードを表示します。</value>
   </data>
   <data name="HelpOptionsHelp" xml:space="preserve">
-    <value>Show this message.</value>
+    <value>このヘルプ メッセージを表示します。</value>
   </data>
   <data name="HelpOptionsIndent" xml:space="preserve">
-    <value>Output with indednt. default:    (double space)</value>
+    <value>インデントを指定して出力します。既定:    (スペース2文字)</value>
   </data>
   <data name="HelpOptionsNewLine" xml:space="preserve">
-    <value>Output new line charactor(s). default: CRLF</value>
+    <value>出力する改行コード。 既定: CRLF</value>
   </data>
   <data name="HelpOptionsNewLineEx" xml:space="preserve">
     <value>LINECODE: {0}</value>
     <comment>0:enum</comment>
   </data>
   <data name="HelpOptionsNoIndent" xml:space="preserve">
-    <value>Output with no indent.</value>
+    <value>インデントなしで出力。</value>
   </data>
   <data name="HelpOptionsOutput" xml:space="preserve">
-    <value>Output file. Specify export file. It is able to set input file.</value>
+    <value>出力ファイルを指定。出力ファイルを指定してください。
+入力ファイルを指定することも可能です。(上書きされます)</value>
   </data>
   <data name="HelpOptionsVersion" xml:space="preserve">
-    <value>Show version.</value>
+    <value>バージョンを表示。</value>
   </data>
   <data name="MessageArguments" xml:space="preserve">
-    <value>args: {0}</value>
+    <value>引数: {0}</value>
     <comment>0:arguments</comment>
   </data>
   <data name="MessageVersion" xml:space="preserve">
-    <value>{0} Version: {1}</value>
+    <value>{0} バージョン: {1}</value>
     <comment>0:filename, 1:version</comment>
   </data>
 </root>

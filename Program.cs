@@ -141,7 +141,7 @@ namespace XmlComplex
                     }
                     Console.WriteLine();
                     foreach(var line in opts.Skip(3))
-                        Console.WriteLine("\t\t{0}", line);
+                        Console.WriteLine("\t\t{0}", line.Replace("\r\n", "\r\n\t\t"));
                     Console.WriteLine();
                 }
 
@@ -159,8 +159,7 @@ namespace XmlComplex
                 return -2;
             }
 
-            var _ex = new XmlComplexer();
-            var _basedoc = _ex.Combine(_items.First(), _items.Skip(1).ToArray());
+            var _basedoc = XmlComplexer.Combine(_items.First(), _items.Skip(1).ToArray());
             if (options.ContainsKey("encoding"))
             {
                 var settings = new XmlWriterSettings();

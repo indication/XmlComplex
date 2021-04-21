@@ -152,7 +152,7 @@ namespace XmlComplex.Properties {
         }
         
         /// <summary>
-        ///   Output line break charactor(s). default: CRLF に類似しているローカライズされた文字列を検索します。
+        ///   Output new line charactor(s). default: CRLF に類似しているローカライズされた文字列を検索します。
         /// </summary>
         internal static string HelpOptionsNewLine {
             get {
