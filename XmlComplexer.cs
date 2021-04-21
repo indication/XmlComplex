@@ -16,7 +16,7 @@ namespace XmlComplex
         /// <param name="_items">Merge files</param>
         /// <param name="_baseFile">Base file</param>
         /// <returns>Merged XML document</returns>
-        public XmlDocument Combine(string _baseFile, params string[] _items)
+        static public XmlDocument Combine(string _baseFile, params string[] _items)
         {
             var  _basedoc = new XmlDocument();
             _basedoc.Load(_baseFile);
@@ -35,7 +35,7 @@ namespace XmlComplex
         /// </summary>
         /// <param name="basedata">Base XML document</param>
         /// <param name="importdata">Merge XML document</param>
-        void proc(XmlElement basedata, XmlElement importdata)
+        static void proc(XmlElement basedata, XmlElement importdata)
         {
             if (basedata == null || importdata == null)
             {
@@ -71,14 +71,14 @@ namespace XmlComplex
         /// <returns>is same</returns>
         static bool isSameElement(XmlElement basedata, XmlElement importdata)
         {
-            if (basedata.Name != importdata.Name)
+            if (basedata.Name != importdata.Name || basedata.Attributes.Count != importdata.Attributes.Count)
                 return false;
             return basedata.Attributes
                 .Cast<XmlAttribute>()
                 .All(_attr => 
                     importdata.Attributes
                         .Cast<XmlAttribute>()
-                        .All(_check => 
+                        .Any(_check => 
                             _attr.Name.Equals(_check.Name) &&
                             _attr.Value == _check.Value
                             )
