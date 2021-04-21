@@ -5,28 +5,34 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Xml;
+using XmlComplex.Properties;
 
 namespace XmlComplex
 {
     class Program
     {
-        
+        /// <summary>
+        /// Main
+        /// </summary>
+        /// <param name="args"></param>
+        /// <returns>return code</returns>
         [STAThread]
         static int Main(string[] args)
         {
             var _items = GetNoOption(args).ToList();
-            Console.WriteLine("args: {0}", string.Join(",", _items));
-            var options = GetOptions(args, new[] {
+            //Console.WriteLine(Resources.MessageArguments, string.Join(",", _items));
+            var optionParams = new[] {
                 //from, to
-                new [] { "o", "output" },
-                new [] { "n", "newline" },
-                new [] { "es", "encodings" },
-                new [] { "e", "encoding" },
-                new [] { "i-", "no-indent" },
-                new [] { "i", "indent" },
-                new [] { "v", "version" },
-                new [] { "h", "help" },
-            });
+                new [] { "o", "output", "FILE", Resources.HelpOptionsOutput },
+                new [] { "n", "newline", "LINECODE", Resources.HelpOptionsNewLine, string.Format(Resources.HelpOptionsNewLineEx, string.Join("|", Enum.GetNames(typeof(NewLineKind))))},
+                new [] { "es", "encodings", "", Resources.HelpOptionsEncodings },
+                new [] { "e", "encoding", "ENCODNG", Resources.HelpOptionsEncoding, Resources.HelpEncodingExt },
+                new [] { "i-", "no-indent", "", Resources.HelpOptionsNoIndent },
+                new [] { "i", "indent", "INDENTCHAR", Resources.HelpOptionsIndent },
+                new [] { "v", "version", "", Resources.HelpOptionsVersion },
+                new [] { "h", "help", "", Resources.HelpOptionsHelp },
+            };
+            var options = GetOptions(args, optionParams);
 
             var newline = Environment.NewLine;
             do
@@ -51,10 +57,17 @@ namespace XmlComplex
                         break;
 
                     }
-                    Console.WriteLine("Line code is invalid: {0}", options["newline"]);
+                    Console.WriteLine(Resources.ErrorInvalidLineCode, options["newline"]);
                     return -1;
                 }
             } while (false);
+            if (options.ContainsKey("version"))
+            {
+                var asm = Assembly.GetExecutingAssembly();
+                var version = Attribute.GetCustomAttribute(asm, typeof(AssemblyFileVersionAttribute)) as AssemblyFileVersionAttribute;
+                Console.WriteLine(Resources.MessageVersion, Path.GetFileName(asm.Location), version?.Version);
+                return 0;
+            }
             Encoding encode = null;
             do
             {
@@ -88,52 +101,57 @@ namespace XmlComplex
                         }
                         catch (ArgumentException ex)
                         {
-                            Console.WriteLine("Encoding {0} is invalid: {1}", str, ex.Message);
+                            Console.WriteLine(Resources.ErrorInvalidEncoding, str, ex.Message);
                         }
                     }
                     Console.WriteLine();
-                    Console.WriteLine("Supported encodings:");
+                    Console.WriteLine(Resources.HelpEncoding);
                     foreach (var enc in Encoding.GetEncodings().OrderBy(w => w.Name))
                     {
                         Console.WriteLine("\t{0}\t{1}", enc.Name, enc.DisplayName);
                     }
-                    Console.WriteLine("\tUTF-8BOM/UTF-16BOM/UTF-16BEBOM/UTF-32BOM/UTF-32BEBOM is supported.");
-                    return -1;
+                    Console.WriteLine("\t{0}",Resources.HelpEncodingExt);
+                    return options.ContainsKey("encodings")  ? 0 : -1;
                 }
             } while (false);
             if (_items.Count < 1 || options.ContainsKey("help") || !options.ContainsKey("output"))
             {
-                var filename = Path.GetFileName(Assembly.GetExecutingAssembly().Location);
-                Console.WriteLine("{0} -o=exportfile.xml inputfile1.xml inputfile2.xml", filename);
-                Console.WriteLine("Options: ");
-                Console.WriteLine("\t-o=FILE [--output=FILE]");
-                Console.WriteLine("\t\tOutput file. Specify export file. It is able to set input file");
-                Console.WriteLine();
-                Console.WriteLine("\t-e=ENCODNG [--encoding=ENCODING]");
-                Console.WriteLine("\t\tOutput encoding. default: utf8 (without BOM)");
-                Console.WriteLine("\t\tUTF-8BOM/UTF-16BOM/UTF-16BEBOM/UTF-32BOM/UTF-32BEBOM is supported.");
-                Console.WriteLine();
-                Console.WriteLine("\t-i=INDENTCHAR [--indent=INDENTCHAR]");
-                Console.WriteLine("\t\tOutput with indednt. default:    (double space)");
-                Console.WriteLine("\t-i- [--no-indent]");
-                Console.WriteLine("\t\tOutput with no indent");
-                Console.WriteLine();
-                Console.WriteLine("\t-n=LINECODE [--newline=LINECODE]");
-                Console.WriteLine("\t\tOutput line break charactor(s). default: CRLF");
-                Console.WriteLine("\t\tLINECODE: {0}", string.Join("|", Enum.GetNames(typeof(NewLineKind))));
-                Console.WriteLine();
-                Console.WriteLine("\t-es [--encodings]");
-                Console.WriteLine("\t\tShow supported encodings.");
-                Console.WriteLine();
-                Console.WriteLine("\t-h --help");
-                Console.WriteLine("\t\tShow this message");
-                return -1;
+                var asm = Assembly.GetExecutingAssembly();
+                var copyright = Attribute.GetCustomAttribute(asm, typeof(AssemblyCopyrightAttribute)) as AssemblyCopyrightAttribute;
+                var title = Attribute.GetCustomAttribute(asm, typeof(AssemblyTitleAttribute)) as AssemblyTitleAttribute;
+                Console.WriteLine("{0} ({1})", title?.Title, copyright?.Copyright);
+                var filename = Path.GetFileName(asm.Location);
+                Console.WriteLine(Resources.HelpMessage, filename, Resources.HelpEncodingExt, string.Join("|", Enum.GetNames(typeof(NewLineKind))));
+                foreach (var opts in optionParams)
+                {
+                    Console.Write("\t");
+                    if (!string.IsNullOrEmpty(opts[0]))
+                    {
+                        if (!string.IsNullOrEmpty(opts[2]))
+                            Console.Write("-{0}={2} ", opts);
+                        else
+                            Console.Write("-{0} ", opts);
+                    }
+                    if (!string.IsNullOrEmpty(opts[1]))
+                    {
+                        if (!string.IsNullOrEmpty(opts[2]))
+                            Console.Write("[--{1}={2}]", opts);
+                        else
+                            Console.Write("[--{1}]", opts);
+                    }
+                    Console.WriteLine();
+                    foreach(var line in opts.Skip(3))
+                        Console.WriteLine("\t\t{0}", line);
+                    Console.WriteLine();
+                }
+
+                return options.ContainsKey("help")  ? 0 : -1;
             }
             
             bool findAll = true;
             foreach (var _item in _items.Where(w => !File.Exists(w)))
             {
-                Console.WriteLine(string.Format("{0} is not Found.", _item));
+                Console.WriteLine(string.Format(Resources.ErrorFileNotFound, _item));
                 findAll = false;
             }
             if (!findAll)
