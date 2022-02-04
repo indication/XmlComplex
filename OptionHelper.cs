@@ -1,13 +1,28 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
 namespace XmlComplex
 {
-    static class OptionHelper
+    partial class OptionHelper
     {
-
+        /// <summary>
+        /// Options param
+        /// </summary>
+        protected internal List<OptionValue> OptionValues { get; } = new List<OptionValue>();
+        /// <summary>
+        /// Add option
+        /// </summary>
+        /// <param name="shortName">short name</param>
+        /// <param name="longName">long name</param>
+        /// <param name="optName">option name for help message</param>
+        /// <param name="messages">help messages</param>
+        /// <returns>this instance</returns>
+        public OptionHelper AddOption(string shortName, string longName, string optName, params string[] messages)
+        {
+            OptionValues.Add(new OptionValue(shortName, longName, optName, messages));
+            return this;
+        }
         /// <summary>
         /// Get option strings from argument array
         /// </summary>
@@ -16,17 +31,17 @@ namespace XmlComplex
         /// <remarks>
         /// Start with - value is option and value is separated by =.
         /// </remarks>
-        static public Dictionary<string, string> GetOptions(string[] args, string[][] transcodes)
+        public Dictionary<string, string> GetOptions(string[] args)
         {
             return args.Where(w => w.StartsWith("-"))
                 .Select((item, i) => item.TrimStart('-').Split(new[] { '=' }, 2))
                 .Select((k, i) =>
                 {
                     var key = k[0].ToLower();
-                    var trans = transcodes?.FirstOrDefault(w => w[0] == key);
+                    var trans = OptionValues?.FirstOrDefault(w => w.Short == key);
                     return new
                     {
-                        Key = trans != null ? trans[1] : key,
+                        Key = trans != null ? trans.Long : key,
                         Value = k.Length > 1 ? k[1] : string.Empty,
                     };
                 })
@@ -38,7 +53,7 @@ namespace XmlComplex
         /// </summary>
         /// <param name="args">Argument array</param>
         /// <returns>String array</returns>
-        static public IEnumerable<string> GetNoOption(string[] args)
+        public IEnumerable<string> GetNoOption(string[] args)
         {
             return args.Where(w => !w.StartsWith("-"));
         }
@@ -48,29 +63,29 @@ namespace XmlComplex
         /// </summary>
         /// <param name="args">Argument array</param>
         /// <returns></returns>
-        static public IEnumerable<string> GetHelp(string[][] args)
+        public IEnumerable<string> GetHelp()
         {
             var sb = new StringBuilder();
-            foreach (var opts in args)
+            foreach (var opts in OptionValues)
             {
                 sb.Clear();
                 sb.Append("\t");
-                if (!string.IsNullOrEmpty(opts[0]))
+                if (!string.IsNullOrEmpty(opts.Short))
                 {
-                    if (!string.IsNullOrEmpty(opts[2]))
-                        sb.AppendFormat("-{0}={2} ", opts);
+                    if (!string.IsNullOrEmpty(opts.HelpOptionName))
+                        sb.AppendFormat("-{0}={2} ", opts.Short, opts.Long, opts.HelpOptionName);
                     else
-                        sb.AppendFormat("-{0} ", opts);
+                        sb.AppendFormat("-{0} ", opts.Short, opts.Long, opts.HelpOptionName);
                 }
-                if (!string.IsNullOrEmpty(opts[1]))
+                if (!string.IsNullOrEmpty(opts.Long))
                 {
-                    if (!string.IsNullOrEmpty(opts[2]))
-                        sb.AppendFormat("[--{1}={2}]", opts);
+                    if (!string.IsNullOrEmpty(opts.HelpOptionName))
+                        sb.AppendFormat("[--{1}={2}]", opts.Short, opts.Long, opts.HelpOptionName);
                     else
-                        sb.AppendFormat("[--{1}]", opts);
+                        sb.AppendFormat("[--{1}]", opts.Short, opts.Long, opts.HelpOptionName);
                 }
                 yield return sb.ToString();
-                foreach (var line in opts.Skip(3))
+                foreach (var line in opts.HelpMessages)
                     yield return string.Format("\t\t{0}", line.Replace("\r\n", "\r\n\t\t"));
                 yield return string.Empty;
             }

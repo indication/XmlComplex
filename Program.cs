@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -19,20 +18,19 @@ namespace XmlComplex
         [STAThread]
         static int Main(string[] args)
         {
-            var _items = OptionHelper.GetNoOption(args).ToList();
-            //Console.WriteLine(Resources.MessageArguments, string.Join(",", _items));
-            var optionParams = new[] {
-                //from, to
-                new [] { "o", "output", "FILE", Resources.HelpOptionsOutput },
-                new [] { "n", "newline", "LINECODE", Resources.HelpOptionsNewLine, string.Format(Resources.HelpOptionsNewLineEx, string.Join("|", Enum.GetNames(typeof(NewLineKind))))},
-                new [] { "es", "encodings", "", Resources.HelpOptionsEncodings },
-                new [] { "e", "encoding", "ENCODNG", Resources.HelpOptionsEncoding, Resources.HelpEncodingExt },
-                new [] { "i-", "no-indent", "", Resources.HelpOptionsNoIndent },
-                new [] { "i", "indent", "INDENTCHAR", Resources.HelpOptionsIndent },
-                new [] { "v", "version", "", Resources.HelpOptionsVersion },
-                new [] { "h", "help", "", Resources.HelpOptionsHelp },
-            };
-            var options = OptionHelper.GetOptions(args, optionParams);
+            var argHelper = new OptionHelper()
+                .AddOption("o", "output", "FILE", Resources.HelpOptionsOutput)
+                .AddOption("n", "newline", "LINECODE", Resources.HelpOptionsNewLine, string.Format(Resources.HelpOptionsNewLineEx, string.Join("|", Enum.GetNames(typeof(NewLineKind)))))
+                .AddOption("es", "encodings", "", Resources.HelpOptionsEncodings)
+                .AddOption("e", "encoding", "ENCODNG", Resources.HelpOptionsEncoding, Resources.HelpEncodingExt)
+                .AddOption("i-", "no-indent", "", Resources.HelpOptionsNoIndent)
+                .AddOption("i", "indent", "INDENTCHAR", Resources.HelpOptionsIndent)
+                .AddOption("v", "version", "", Resources.HelpOptionsVersion)
+                .AddOption("h", "help", "", Resources.HelpOptionsHelp)
+                ;
+            
+            var _items = argHelper.GetNoOption(args).ToList();
+            var options = argHelper.GetOptions(args);
 
             var newline = Environment.NewLine;
             if (options.ContainsKey("newline"))
@@ -73,7 +71,7 @@ namespace XmlComplex
             }
             if (_items.Count < 1 || options.ContainsKey("help") || !options.ContainsKey("output"))
             {
-                ShowHelp(optionParams);
+                ShowHelp(argHelper);
                 return options.ContainsKey("help") ? 0 : -1;
             }
 
@@ -95,8 +93,7 @@ namespace XmlComplex
                 settings.Encoding = encode;
                 settings.Indent = !options.ContainsKey("no-indent");
                 settings.IndentChars = options.ContainsKey("indent") ? options["indent"] : "  ";
-                if (newline != null)
-                    settings.NewLineChars = newline;
+                settings.NewLineChars = newline;
                 using (var stream = XmlWriter.Create(options["output"], settings))
                 {
                     _basedoc.Save(stream);
@@ -177,8 +174,8 @@ namespace XmlComplex
         /// <summary>
         /// Show help
         /// </summary>
-        /// <param name="optionParams"></param>
-        private static void ShowHelp(string[][] optionParams)
+        /// <param name="helper"></param>
+        private static void ShowHelp(OptionHelper helper)
         {
             var asm = Assembly.GetExecutingAssembly();
             var copyright = Attribute.GetCustomAttribute(asm, typeof(AssemblyCopyrightAttribute)) as AssemblyCopyrightAttribute;
@@ -186,7 +183,7 @@ namespace XmlComplex
             Console.WriteLine("{0} ({1})", title?.Title, copyright?.Copyright);
             var filename = Path.GetFileName(asm.Location);
             Console.WriteLine(Resources.HelpMessage, filename, Resources.HelpEncodingExt, string.Join("|", Enum.GetNames(typeof(NewLineKind))));
-            foreach (var line in OptionHelper.GetHelp(optionParams))
+            foreach (var line in helper.GetHelp())
                 Console.WriteLine(line);
         }
     }
