@@ -5,6 +5,10 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Tag to release (e.g. v1.2.3)'
+        required: true
 
 permissions:
   contents: write
@@ -12,10 +16,14 @@ permissions:
 jobs:
   release:
     runs-on: windows-latest
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag || github.ref_name }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
 
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
@@ -27,16 +35,17 @@ jobs:
         run: nuget restore XmlComplex.sln
 
       - name: Build (Release)
-        run: msbuild XmlComplex.sln /p:Configuration=Release /p:Platform=AnyCPU
+        run: msbuild XmlComplex.sln /p:Configuration=Release /p:Platform="Any CPU"
 
       - name: Package artifact
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path artifacts -Force | Out-Null
-          Compress-Archive -Path .\bin\Release\* -DestinationPath .\artifacts\XmlComplex-${{ github.ref_name }}.zip -Force
+          Compress-Archive -Path .\App\bin\Release\* -DestinationPath .\artifacts\XmlComplex-${{ env.RELEASE_TAG }}.zip -Force
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: .\artifacts\XmlComplex-${{ github.ref_name }}.zip
+          tag_name: ${{ env.RELEASE_TAG }}
+          files: .\artifacts\XmlComplex-${{ env.RELEASE_TAG }}.zip
           generate_release_notes: true
