@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -18,7 +19,38 @@ namespace XmlComplex
         [STAThread]
         static int Main(string[] args)
         {
-            var argHelper = new OptionHelper()
+            var optionHelper = CreateOptionHelper();
+            var items = optionHelper.GetNoOption(args).ToList();
+            var options = optionHelper.GetOptions(args);
+
+            if (options.ContainsKey("version"))
+            {
+                ShowVersion();
+                return 0;
+            }
+
+            if (!TryGetNewLine(options, out var newline))
+                return -1;
+
+            if (!TryGetEncoding(options, out var encoding, out var encodingExitCode))
+                return encodingExitCode;
+
+            if (items.Count < 1 || options.ContainsKey("help") || !options.ContainsKey("output"))
+            {
+                ShowHelp(optionHelper);
+                return options.ContainsKey("help") ? 0 : -1;
+            }
+
+            if (!HasAllInputFiles(items))
+                return -2;
+
+            SaveCombinedXml(items, options, newline, encoding);
+            return 0;
+        }
+
+        private static OptionHelper CreateOptionHelper()
+        {
+            return new OptionHelper()
                 .AddOption("o", "output", "FILE", Resources.HelpOptionsOutput)
                 .AddOption("n", "newline", "LINECODE", Resources.HelpOptionsNewLine, string.Format(Resources.HelpOptionsNewLineEx, string.Join("|", Enum.GetNames(typeof(NewLineKind)))))
                 .AddOption("es", "encodings", "", Resources.HelpOptionsEncodings)
@@ -26,105 +58,85 @@ namespace XmlComplex
                 .AddOption("i-", "no-indent", "", Resources.HelpOptionsNoIndent)
                 .AddOption("i", "indent", "INDENTCHAR", Resources.HelpOptionsIndent)
                 .AddOption("v", "version", "", Resources.HelpOptionsVersion)
-                .AddOption("h", "help", "", Resources.HelpOptionsHelp)
-                ;
-            
-            var _items = argHelper.GetNoOption(args).ToList();
-            var options = argHelper.GetOptions(args);
+                .AddOption("h", "help", "", Resources.HelpOptionsHelp);
+        }
 
-            var newline = Environment.NewLine;
-            if (options.ContainsKey("newline"))
-            {
-                newline = GetNewLineCode(options["newline"]);
-                if (newline == null)
-                {
-                    Console.WriteLine(Resources.ErrorInvalidLineCode, options["newline"]);
-                    return -1;
-                }
-            }
-            if (options.ContainsKey("version"))
-            {
-                ShowVersion();
-                return 0;
-            }
-            Encoding encode = null;
-            if (options.ContainsKey("encoding") || options.ContainsKey("encodings"))
-            {
-                if (options.ContainsKey("encoding"))
-                {
-                    var str = options["encoding"];
-                    try
-                    {
-                        encode = GetEncoding(str);
-                    }
-                    catch (ArgumentException ex)
-                    {
-                        Console.WriteLine(Resources.ErrorInvalidEncoding, str, ex.Message);
-                        Console.WriteLine();
-                    }
-                }
-                if (encode == null || options.ContainsKey("encodings"))
-                {
-                    ShowEncodings();
-                    return options.ContainsKey("encodings") ? 0 : -1;
-                }
-            }
-            if (_items.Count < 1 || options.ContainsKey("help") || !options.ContainsKey("output"))
-            {
-                ShowHelp(argHelper);
-                return options.ContainsKey("help") ? 0 : -1;
-            }
+        private static bool TryGetNewLine(Dictionary<string, string> options, out string newLine)
+        {
+            newLine = Environment.NewLine;
+            if (!options.ContainsKey("newline"))
+                return true;
 
-            bool findAll = true;
-            foreach (var _item in _items.Where(w => !File.Exists(w)))
-            {
-                Console.WriteLine(string.Format(Resources.ErrorFileNotFound, _item));
-                findAll = false;
-            }
-            if (!findAll)
-            {
-                return -2;
-            }
+            newLine = NewLineResolver.Resolve(options["newline"]);
+            if (newLine != null)
+                return true;
 
-            var _basedoc = XmlComplexer.Combine(_items.First(), _items.Skip(1).ToArray());
+            Console.WriteLine(Resources.ErrorInvalidLineCode, options["newline"]);
+            return false;
+        }
+
+        private static bool TryGetEncoding(Dictionary<string, string> options, out Encoding encoding, out int exitCode)
+        {
+            encoding = null;
+            exitCode = 0;
+            if (!options.ContainsKey("encoding") && !options.ContainsKey("encodings"))
+                return true;
+
             if (options.ContainsKey("encoding"))
             {
-                var settings = new XmlWriterSettings();
-                settings.Encoding = encode;
-                settings.Indent = !options.ContainsKey("no-indent");
-                settings.IndentChars = options.ContainsKey("indent") ? options["indent"] : "  ";
-                settings.NewLineChars = newline;
-                using (var stream = XmlWriter.Create(options["output"], settings))
+                var encodingName = options["encoding"];
+                try
                 {
-                    _basedoc.Save(stream);
+                    encoding = EncodingResolver.Resolve(encodingName);
+                }
+                catch (ArgumentException ex)
+                {
+                    Console.WriteLine(Resources.ErrorInvalidEncoding, encodingName, ex.Message);
+                    Console.WriteLine();
                 }
             }
-            else
-                _basedoc.Save(options["output"]);
-            return 0;
+
+            if (encoding != null && !options.ContainsKey("encodings"))
+                return true;
+
+            ShowEncodings();
+            exitCode = options.ContainsKey("encodings") ? 0 : -1;
+            return false;
         }
-        /// <summary>
-        /// Get new line code
-        /// </summary>
-        /// <param name="newLine">name for new line</param>
-        /// <returns>string from names</returns>
-        private static string GetNewLineCode(string newLine)
+
+        private static bool HasAllInputFiles(IEnumerable<string> items)
         {
-            NewLineKind kind;
-            if (Enum.TryParse(newLine, true, out kind))
+            var hasAll = true;
+            foreach (var item in items.Where(w => !File.Exists(w)))
             {
-                switch (kind)
-                {
-                    case NewLineKind.CR:
-                        return "\r";
-                    case NewLineKind.LF:
-                        return "\n";
-                    case NewLineKind.CRLF:
-                        return "\r\n";
-                }
+                Console.WriteLine(string.Format(Resources.ErrorFileNotFound, item));
+                hasAll = false;
             }
-            return null;
+            return hasAll;
         }
+
+        private static void SaveCombinedXml(IList<string> items, Dictionary<string, string> options, string newline, Encoding encoding)
+        {
+            var baseDoc = XmlComplexer.Combine(items.First(), items.Skip(1).ToArray());
+            if (!options.ContainsKey("encoding"))
+            {
+                baseDoc.Save(options["output"]);
+                return;
+            }
+
+            var settings = new XmlWriterSettings
+            {
+                Encoding = encoding,
+                Indent = !options.ContainsKey("no-indent"),
+                IndentChars = options.ContainsKey("indent") ? options["indent"] : "  ",
+                NewLineChars = newline
+            };
+            using (var stream = XmlWriter.Create(options["output"], settings))
+            {
+                baseDoc.Save(stream);
+            }
+        }
+
         /// <summary>
         /// Show encodings
         /// </summary>
@@ -137,31 +149,7 @@ namespace XmlComplex
             }
             Console.WriteLine("\t{0}", Resources.HelpEncodingExt);
         }
-        /// <summary>
-        /// Get encoding from param
-        /// </summary>
-        /// <param name="str">encoding name</param>
-        /// <returns></returns>
-        /// <exception cref="ArgumentException">encoding is not found</exception>
-        private static Encoding GetEncoding(string str)
-        {
-            var hasBe = str.ToLower().Contains("be");
-            var hasBom = str.ToLower().Contains("bom") && !str.ToLower().Contains("nobom");
-            if (str.StartsWith("utf-8", StringComparison.CurrentCultureIgnoreCase) || str.StartsWith("utf8", StringComparison.CurrentCultureIgnoreCase))
-            {
-                return new UTF8Encoding(hasBom);
-            }
-            else if (str.StartsWith("utf-32", StringComparison.CurrentCultureIgnoreCase) || str.StartsWith("utf32", StringComparison.CurrentCultureIgnoreCase))
-            {
-                return new UTF32Encoding(hasBe, hasBom);
-            }
-            else if (str.StartsWith("utf-16", StringComparison.CurrentCultureIgnoreCase) || str.StartsWith("utf16", StringComparison.CurrentCultureIgnoreCase))
-            {
-                return new UnicodeEncoding(hasBe, hasBom);
-            }
 
-            return Encoding.GetEncoding(str);
-        }
         /// <summary>
         /// Show version
         /// </summary>

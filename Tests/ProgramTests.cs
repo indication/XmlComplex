@@ -1,5 +1,4 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using System.Reflection;
 using System.Text;
 
 namespace XmlComplex.Tests
@@ -8,24 +7,30 @@ namespace XmlComplex.Tests
     public class ProgramTests
     {
         [TestMethod]
-        public void GetNewLineCode_ReturnsExpectedValueForKnownKinds()
+        public void ResolveNewLine_ReturnsExpectedValueForKnownKinds()
         {
-            Assert.AreEqual("\r", InvokeGetNewLineCode("CR"));
-            Assert.AreEqual("\n", InvokeGetNewLineCode("LF"));
-            Assert.AreEqual("\r\n", InvokeGetNewLineCode("CRLF"));
+            Assert.AreEqual("\r", NewLineResolver.Resolve("CR"));
+            Assert.AreEqual("\n", NewLineResolver.Resolve("LF"));
+            Assert.AreEqual("\r\n", NewLineResolver.Resolve("CRLF"));
         }
 
         [TestMethod]
-        public void GetNewLineCode_ReturnsNullForUnknownKinds()
+        public void ResolveNewLine_IsCaseInsensitive()
         {
-            Assert.IsNull(InvokeGetNewLineCode("invalid"));
+            Assert.AreEqual("\r\n", NewLineResolver.Resolve("crlf"));
         }
 
         [TestMethod]
-        public void GetEncoding_ParsesUtf8BomAndNoBom()
+        public void ResolveNewLine_ReturnsNullForUnknownKinds()
         {
-            var withBom = InvokeGetEncoding("utf-8bom") as UTF8Encoding;
-            var noBom = InvokeGetEncoding("utf8nobom") as UTF8Encoding;
+            Assert.IsNull(NewLineResolver.Resolve("invalid"));
+        }
+
+        [TestMethod]
+        public void ResolveEncoding_ParsesUtf8BomAndNoBom()
+        {
+            var withBom = EncodingResolver.Resolve("utf-8bom") as UTF8Encoding;
+            var noBom = EncodingResolver.Resolve("utf8nobom") as UTF8Encoding;
 
             Assert.IsNotNull(withBom);
             Assert.IsNotNull(noBom);
@@ -33,16 +38,32 @@ namespace XmlComplex.Tests
             Assert.AreEqual(0, noBom.GetPreamble().Length);
         }
 
-        private static string InvokeGetNewLineCode(string value)
+        [TestMethod]
+        public void ResolveEncoding_ParsesUtf16BigEndianWithBom()
         {
-            var method = typeof(Program).GetMethod("GetNewLineCode", BindingFlags.NonPublic | BindingFlags.Static);
-            return (string)method.Invoke(null, new object[] { value });
+            var utf16 = EncodingResolver.Resolve("utf16bebom") as UnicodeEncoding;
+
+            Assert.IsNotNull(utf16);
+            Assert.IsTrue(utf16.GetPreamble().Length > 0);
+            Assert.AreEqual(1201, utf16.CodePage);
         }
 
-        private static Encoding InvokeGetEncoding(string value)
+        [TestMethod]
+        public void ResolveEncoding_ParsesUtf32LittleEndianWithoutBom()
         {
-            var method = typeof(Program).GetMethod("GetEncoding", BindingFlags.NonPublic | BindingFlags.Static);
-            return (Encoding)method.Invoke(null, new object[] { value });
+            var utf32 = EncodingResolver.Resolve("utf-32") as UTF32Encoding;
+
+            Assert.IsNotNull(utf32);
+            Assert.AreEqual(12000, utf32.CodePage);
+            Assert.AreEqual(0, utf32.GetPreamble().Length);
+        }
+
+        [TestMethod]
+        public void ResolveEncoding_UsesFrameworkEncodingForCodePageName()
+        {
+            var encoding = EncodingResolver.Resolve("shift_jis");
+
+            Assert.AreEqual(932, encoding.CodePage);
         }
     }
 }
