@@ -8,12 +8,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
     <PackageReference Include="MSTest.TestAdapter" Version="3.6.3" />
     <PackageReference Include="MSTest.TestFramework" Version="3.6.3" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\App\App.csproj" AdditionalProperties="Platform=AnyCPU" />
+    <ProjectReference Include="..\App\App.csproj" AdditionalProperties="Platform=AnyCPU" />
+
   </ItemGroup>
 </Project>
