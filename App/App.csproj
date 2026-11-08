@@ -41,7 +41,13 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CommandArgumentException.cs" />
+    <Compile Include="CommandArguments.cs" />
+    <Compile Include="EncodingResolver.cs" />
     <Compile Include="NewLineKind.cs" />
+    <Compile Include="NewLineResolver.cs" />
+    <Compile Include="OptionHelper.cs" />
+    <Compile Include="OptionHelper.OptionValue.cs" />
     <Compile Include="Properties\Resources.Designer.cs">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
