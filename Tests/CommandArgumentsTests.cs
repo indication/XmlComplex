@@ -1,5 +1,7 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System;
 using System.IO;
+using System.Reflection;
 
 namespace XmlComplex.Tests
 {
@@ -9,80 +11,164 @@ namespace XmlComplex.Tests
         [TestMethod]
         public void Parse_SetsInputOutputAndFlags()
         {
-            var args = CommandArguments.Parse(new[] { "base.xml", "-o=out.xml", "--no-indent", "--indent=\t" });
-
-            Assert.AreEqual(1, args.InputFiles.Count);
-            Assert.AreEqual("base.xml", args.InputFiles[0]);
-            Assert.AreEqual("out.xml", args.OutputPath);
-            Assert.IsFalse(args.Indent);
-            Assert.AreEqual("\t", args.IndentChars);
-        }
-
-        [TestMethod]
-        public void HasRequiredArguments_ReturnsTrueWhenInputAndOutputExist()
-        {
-            var args = CommandArguments.Parse(new[] { "base.xml", "-o=out.xml" });
-
-            Assert.IsTrue(args.HasRequiredArguments());
-        }
-
-        [TestMethod]
-        public void HasRequiredArguments_ReturnsFalseWhenHelpOptionExists()
-        {
-            var args = CommandArguments.Parse(new[] { "base.xml", "-o=out.xml", "--help" });
-
-            Assert.IsFalse(args.HasRequiredArguments());
-        }
-
-        [TestMethod]
-        public void TryGetNewLine_StoresResolvedNewLineChars()
-        {
-            var args = CommandArguments.Parse(new[] { "base.xml", "-o=out.xml", "--newline=CRLF" });
-
-            var result = args.TryGetNewLine();
-
-            Assert.IsTrue(result);
-            Assert.AreEqual("\r\n", args.NewLineChars);
-        }
-
-        [TestMethod]
-        public void TryGetEncoding_StoresResolvedEncoding()
-        {
-            var args = CommandArguments.Parse(new[] { "base.xml", "-o=out.xml", "--encoding=utf-8bom" });
-
-            var result = args.TryGetEncoding(out var exitCode, out var showEncodings);
-
-            Assert.IsTrue(result);
-            Assert.AreEqual(0, exitCode);
-            Assert.IsFalse(showEncodings);
-            Assert.IsNotNull(args.Encoding);
-            Assert.AreEqual(65001, args.Encoding.CodePage);
-            Assert.IsTrue(args.HasEncodingOption);
-        }
-
-        [TestMethod]
-        public void HasAllInputFiles_ReturnsFalseWhenFileDoesNotExist()
-        {
-            var args = CommandArguments.Parse(new[] { "not-found.xml", "-o=out.xml" });
-
-            Assert.IsFalse(args.HasAllInputFiles());
-        }
-
-        [TestMethod]
-        public void HasAllInputFiles_ReturnsTrueWhenAllFilesExist()
-        {
             var temp = Path.GetTempFileName();
             try
             {
-                var args = CommandArguments.Parse(new[] { temp, "-o=out.xml" });
+                var args = CommandArguments.Parse(new[] { temp, "-o=out.xml", "--no-indent", "--indent=\t" });
 
-                Assert.IsTrue(args.HasAllInputFiles());
+                Assert.AreEqual(1, args.InputFiles.Count);
+                Assert.AreEqual(temp, args.InputFiles[0]);
+                Assert.AreEqual("out.xml", args.OutputPath);
+                Assert.IsFalse(args.Indent);
+                Assert.AreEqual("\t", args.IndentChars);
             }
             finally
             {
                 if (File.Exists(temp))
                     File.Delete(temp);
             }
+        }
+
+        [TestMethod]
+        public void Parse_ResolvesNewLineAndEncoding()
+        {
+            var temp = Path.GetTempFileName();
+            try
+            {
+                var args = CommandArguments.Parse(new[] { temp, "-o=out.xml", "--newline=CRLF", "--encoding=utf-8bom" });
+
+                Assert.AreEqual("\r\n", args.NewLineChars);
+                Assert.IsNotNull(args.Encoding);
+                Assert.AreEqual(65001, args.Encoding.CodePage);
+                Assert.IsTrue(args.Encoding.GetPreamble().Length > 0);
+            }
+            finally
+            {
+                if (File.Exists(temp))
+                    File.Delete(temp);
+            }
+        }
+
+        [TestMethod]
+        public void Parse_ThrowsSuccessExitCode_WhenVersionOptionSpecified()
+        {
+            var temp = Path.GetTempFileName();
+            try
+            {
+                var ex = AssertThrowsCommandArgumentException(() => CommandArguments.Parse(new[] { temp, "-o=out.xml", "--version" }));
+
+                Assert.AreEqual(CommandArgumentSuccessException.ExitCodeValue, ex.ExitCode);
+            }
+            finally
+            {
+                if (File.Exists(temp))
+                    File.Delete(temp);
+            }
+        }
+
+        [TestMethod]
+        public void ShowVersionMessage_WritesAssemblyFileNameToConsole()
+        {
+            var temp = Path.GetTempFileName();
+            try
+            {
+                var args = CommandArguments.Parse(new[] { temp, "-o=out.xml" });
+                var expectedFileName = Path.GetFileName(typeof(CommandArguments).Assembly.Location);
+                var originalOut = Console.Out;
+                var writer = new StringWriter();
+                try
+                {
+                    Console.SetOut(writer);
+
+                    args.ShowVersionMessage();
+                }
+                finally
+                {
+                    Console.SetOut(originalOut);
+                }
+
+                var output = writer.ToString();
+                Assert.IsFalse(string.IsNullOrEmpty(output));
+                Assert.IsTrue(output.Contains(expectedFileName));
+            }
+            finally
+            {
+                if (File.Exists(temp))
+                    File.Delete(temp);
+            }
+        }
+
+        [TestMethod]
+        public void Parse_ThrowsSuccessExitCode_WhenHelpOptionSpecified()
+        {
+            var ex = AssertThrowsCommandArgumentException(() => CommandArguments.Parse(new[] { "--help" }));
+
+            Assert.AreEqual(CommandArgumentSuccessException.ExitCodeValue, ex.ExitCode);
+        }
+
+        [TestMethod]
+        public void Parse_ThrowsSuccessExitCode_WhenEncodingsOptionSpecified()
+        {
+            var ex = AssertThrowsCommandArgumentException(() => CommandArguments.Parse(new[] { "--encodings" }));
+
+            Assert.AreEqual(CommandArgumentSuccessException.ExitCodeValue, ex.ExitCode);
+        }
+
+        [TestMethod]
+        public void Parse_ThrowsInvalidArgumentsExitCode_WhenRequiredArgumentsMissing()
+        {
+            var temp = Path.GetTempFileName();
+            try
+            {
+                var ex = AssertThrowsCommandArgumentException(() => CommandArguments.Parse(new[] { temp }));
+
+                Assert.AreEqual(InvalidCommandArgumentException.ExitCodeValue, ex.ExitCode);
+            }
+            finally
+            {
+                if (File.Exists(temp))
+                    File.Delete(temp);
+            }
+        }
+
+        [TestMethod]
+        public void Parse_ThrowsInvalidArgumentsExitCode_WhenNewLineIsInvalid()
+        {
+            var temp = Path.GetTempFileName();
+            try
+            {
+                var ex = AssertThrowsCommandArgumentException(() => CommandArguments.Parse(new[] { temp, "-o=out.xml", "--newline=invalid" }));
+
+                Assert.AreEqual(InvalidCommandArgumentException.ExitCodeValue, ex.ExitCode);
+            }
+            finally
+            {
+                if (File.Exists(temp))
+                    File.Delete(temp);
+            }
+        }
+
+        [TestMethod]
+        public void Parse_ThrowsMissingInputFileExitCode_WhenInputFileDoesNotExist()
+        {
+            var ex = AssertThrowsCommandArgumentException(() => CommandArguments.Parse(new[] { "not-found.xml", "-o=out.xml" }));
+
+            Assert.AreEqual(MissingInputFileCommandArgumentException.ExitCodeValue, ex.ExitCode);
+        }
+
+        private static CommandArgumentException AssertThrowsCommandArgumentException(Action action)
+        {
+            try
+            {
+                action();
+            }
+            catch (CommandArgumentException ex)
+            {
+                return ex;
+            }
+
+            Assert.Fail("Expected CommandArgumentException was not thrown.");
+            return null;
         }
     }
 }

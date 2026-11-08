@@ -103,57 +103,54 @@ namespace XmlComplex
         /// </summary>
         /// <param name="args">解析対象のコマンドライン引数。</param>
         /// <returns>解析結果を保持する <see cref="CommandArguments"/>。</returns>
+        /// <exception cref="CommandArgumentException">引数が無効、または表示専用オプションで処理終了する場合。</exception>
         public static CommandArguments Parse(string[] args)
         {
             var optionHelper = CreateOptionHelper();
             var inputFiles = optionHelper.GetNoOption(args).ToList();
             var options = optionHelper.GetOptions(args);
-            return new CommandArguments(inputFiles, options, optionHelper);
+            var commandArguments = new CommandArguments(inputFiles, options, optionHelper);
+
+            commandArguments.ResolveNewLineOrThrow();
+            commandArguments.ResolveEncodingOrThrow();
+            commandArguments.EnsureRequiredArgumentsOrThrow();
+            commandArguments.EnsureAllInputFilesOrThrow();
+            commandArguments.ThrowIfHelp();
+            commandArguments.ThrowIfVersion();
+            return commandArguments;
         }
 
         /// <summary>
-        /// 実行に必要な必須引数が揃っているか判定します。
+        /// 改行コードオプションを解決し、無効な場合は例外を送出します。
         /// </summary>
-        /// <returns>入力ファイルと出力指定があり、ヘルプ指定がない場合は <c>true</c>。</returns>
-        public bool HasRequiredArguments()
-        {
-            return InputFiles.Count > 0 && HasOutput && !HasHelpOption;
-        }
-
-        /// <summary>
-        /// 改行オプションを解決し、<see cref="NewLineChars"/> に設定します。
-        /// </summary>
-        /// <returns>改行コードを解決できた場合は <c>true</c>。</returns>
-        public bool TryGetNewLine()
+        /// <exception cref="InvalidCommandArgumentException">改行コードが不正な場合。</exception>
+        private void ResolveNewLineOrThrow()
         {
             NewLineChars = Environment.NewLine;
             if (!Options.ContainsKey("newline"))
-                return true;
+                return;
 
             var resolvedNewLine = NewLineResolver.Resolve(Options["newline"]);
             if (resolvedNewLine != null)
             {
                 NewLineChars = resolvedNewLine;
-                return true;
+                return;
             }
 
             Console.WriteLine(Resources.ErrorInvalidLineCode, Options["newline"]);
-            return false;
+            throw new InvalidCommandArgumentException();
         }
 
         /// <summary>
-        /// エンコーディングオプションを解決し、<see cref="Encoding"/> に設定します。
+        /// エンコーディング関連オプションを解決し、継続不可の場合は例外を送出します。
         /// </summary>
-        /// <param name="exitCode">処理終了時に返す終了コード。</param>
-        /// <param name="showEncodings">エンコーディング一覧表示が必要な場合は <c>true</c>。</param>
-        /// <returns>エンコーディング指定が有効で処理継続可能な場合は <c>true</c>。</returns>
-        public bool TryGetEncoding(out int exitCode, out bool showEncodings)
+        /// <exception cref="CommandArgumentSuccessException">一覧表示のみで正常終了する場合。</exception>
+        /// <exception cref="InvalidCommandArgumentException">エンコーディング指定が不正な場合。</exception>
+        private void ResolveEncodingOrThrow()
         {
             Encoding = null;
-            exitCode = 0;
-            showEncodings = false;
             if (!HasEncodingOption && !ShowEncodings)
-                return true;
+                return;
 
             if (HasEncodingOption)
             {
@@ -170,18 +167,37 @@ namespace XmlComplex
             }
 
             if (Encoding != null && !ShowEncodings)
-                return true;
+                return;
 
-            showEncodings = true;
-            exitCode = ShowEncodings ? 0 : -1;
-            return false;
+            ShowEncodingsHelp();
+            if (ShowEncodings)
+                throw new CommandArgumentSuccessException();
+
+            throw new InvalidCommandArgumentException();
         }
 
         /// <summary>
-        /// 指定された入力ファイルがすべて存在するか確認します。
+        /// 必須引数の有無を検証し、不足時はヘルプを表示して例外を送出します。
         /// </summary>
-        /// <returns>すべての入力ファイルが存在する場合は <c>true</c>。</returns>
-        public bool HasAllInputFiles()
+        /// <exception cref="CommandArgumentSuccessException">ヘルプ表示指定で正常終了する場合。</exception>
+        /// <exception cref="InvalidCommandArgumentException">必須引数が不足している場合。</exception>
+        private void EnsureRequiredArgumentsOrThrow()
+        {
+            if (InputFiles.Count > 0 && HasOutput && !HasHelpOption)
+                return;
+
+            ShowHelp();
+            if (HasHelpOption)
+                throw new CommandArgumentSuccessException();
+
+            throw new InvalidCommandArgumentException();
+        }
+
+        /// <summary>
+        /// 入力ファイルの存在を検証し、見つからないファイルがある場合は例外を送出します。
+        /// </summary>
+        /// <exception cref="MissingInputFileCommandArgumentException">入力ファイルが存在しない場合。</exception>
+        private void EnsureAllInputFilesOrThrow()
         {
             var hasAll = true;
             foreach (var item in InputFiles.Where(w => !File.Exists(w)))
@@ -189,7 +205,59 @@ namespace XmlComplex
                 Console.WriteLine(string.Format(Resources.ErrorFileNotFound, item));
                 hasAll = false;
             }
-            return hasAll;
+
+            if (!hasAll)
+                throw new MissingInputFileCommandArgumentException();
+        }
+
+        /// <summary>
+        /// バージョン情報を表示します。
+        /// </summary>
+        /// <exception cref="CommandArgumentSuccessException">成功</exception>
+        private void ThrowIfVersion()
+        {
+            if (!ShowVersion)
+                return;
+
+            ShowVersionMessage();
+            throw new CommandArgumentSuccessException();
+        }
+
+        /// <summary>
+        /// ヘルプ オプションが指定されている場合にヘルプを表示し、正常終了を通知する例外をスローします。
+        /// </summary>
+        /// <remarks>ヘルプ オプションが指定されていない場合は何も実行しません。</remarks>
+        /// <exception cref="CommandArgumentSuccessException">ヘルプ オプションが指定されている場合に、ヘルプ表示後の正常終了を通知するためにスローされます。</exception>
+        private void ThrowIfHelp ()
+        {
+            if (!HasHelpOption)
+                return;
+
+            ShowHelp();
+            throw new CommandArgumentSuccessException();
+        }
+
+        /// <summary>
+        /// 利用可能なエンコーディング一覧を標準出力へ表示します。
+        /// </summary>
+        private void ShowEncodingsHelp()
+        {
+            Console.WriteLine(Resources.HelpEncoding);
+            foreach (var enc in Encoding.GetEncodings().OrderBy(w => w.Name))
+            {
+                Console.WriteLine("\t{0}\t{1}", enc.Name, enc.DisplayName);
+            }
+            Console.WriteLine("\t{0}", Resources.HelpEncodingExt);
+        }
+
+        /// <summary>
+        /// バージョン情報を標準出力へ表示します。
+        /// </summary>
+        public void ShowVersionMessage()
+        {
+            var asm = Assembly.GetExecutingAssembly();
+            var version = Attribute.GetCustomAttribute(asm, typeof(AssemblyFileVersionAttribute)) as AssemblyFileVersionAttribute;
+            Console.WriteLine(Resources.MessageVersion, Path.GetFileName(asm.Location), version?.Version);
         }
 
         /// <summary>

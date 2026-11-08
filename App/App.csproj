@@ -41,6 +41,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CommandArgumentException.cs" />
     <Compile Include="CommandArguments.cs" />
     <Compile Include="EncodingResolver.cs" />
     <Compile Include="NewLineKind.cs" />
