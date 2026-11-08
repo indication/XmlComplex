@@ -14,8 +14,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Reference Include="XmlComplex">
-      <HintPath>..\App\bin\$(Configuration)\XmlComplex.exe</HintPath>
-    </Reference>
+    <ProjectReference Include="..\App\App.csproj" AdditionalProperties="Platform=AnyCPU" />
   </ItemGroup>
 </Project>
