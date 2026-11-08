@@ -112,10 +112,10 @@ namespace XmlComplex
             var commandArguments = new CommandArguments(inputFiles, options, optionHelper);
 
             commandArguments.ResolveNewLineOrThrow();
+            commandArguments.ThrowIfVersion();
             commandArguments.ResolveEncodingOrThrow();
             commandArguments.EnsureRequiredArgumentsOrThrow();
             commandArguments.EnsureAllInputFilesOrThrow();
-            commandArguments.ThrowIfVersion();
             return commandArguments;
         }
 
