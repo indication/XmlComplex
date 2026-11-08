@@ -22,6 +22,9 @@ namespace XmlComplex
             }
             catch (CommandArgumentException ex)
             {
+                if (!string.IsNullOrEmpty(ex.Message))
+                    Console.WriteLine(ex.Message);
+
                 return ex.ExitCode;
             }
         }

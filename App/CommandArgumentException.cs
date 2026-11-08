@@ -16,6 +16,11 @@ namespace XmlComplex
     {
         public const int ExitCodeValue = 0;
 
+        public CommandArgumentSuccessException(string message = null)
+            : base(message)
+        {
+        }
+
         public override int ExitCode => ExitCodeValue;
     }
 
@@ -23,12 +28,22 @@ namespace XmlComplex
     {
         public const int ExitCodeValue = -1;
 
+        public InvalidCommandArgumentException(string message = null)
+            : base(message)
+        {
+        }
+
         public override int ExitCode => ExitCodeValue;
     }
 
     internal sealed class MissingInputFileCommandArgumentException : CommandArgumentException
     {
         public const int ExitCodeValue = -2;
+
+        public MissingInputFileCommandArgumentException(string message = null)
+            : base(message)
+        {
+        }
 
         public override int ExitCode => ExitCodeValue;
     }

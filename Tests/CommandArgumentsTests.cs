@@ -1,7 +1,6 @@
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.IO;
-using System.Reflection;
 
 namespace XmlComplex.Tests
 {
@@ -58,38 +57,8 @@ namespace XmlComplex.Tests
                 var ex = AssertThrowsCommandArgumentException(() => CommandArguments.Parse(new[] { temp, "-o=out.xml", "--version" }));
 
                 Assert.AreEqual(CommandArgumentSuccessException.ExitCodeValue, ex.ExitCode);
-            }
-            finally
-            {
-                if (File.Exists(temp))
-                    File.Delete(temp);
-            }
-        }
-
-        [TestMethod]
-        public void ShowVersionMessage_WritesAssemblyFileNameToConsole()
-        {
-            var temp = Path.GetTempFileName();
-            try
-            {
-                var args = CommandArguments.Parse(new[] { temp, "-o=out.xml" });
-                var expectedFileName = Path.GetFileName(typeof(CommandArguments).Assembly.Location);
-                var originalOut = Console.Out;
-                var writer = new StringWriter();
-                try
-                {
-                    Console.SetOut(writer);
-
-                    args.ShowVersionMessage();
-                }
-                finally
-                {
-                    Console.SetOut(originalOut);
-                }
-
-                var output = writer.ToString();
-                Assert.IsFalse(string.IsNullOrEmpty(output));
-                Assert.IsTrue(output.Contains(expectedFileName));
+                Assert.IsFalse(string.IsNullOrEmpty(ex.Message));
+                Assert.IsTrue(ex.Message.Contains(Path.GetFileName(typeof(CommandArguments).Assembly.Location)));
             }
             finally
             {

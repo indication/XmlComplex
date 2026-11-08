@@ -115,7 +115,6 @@ namespace XmlComplex
             commandArguments.ResolveEncodingOrThrow();
             commandArguments.EnsureRequiredArgumentsOrThrow();
             commandArguments.EnsureAllInputFilesOrThrow();
-            commandArguments.ThrowIfHelp();
             commandArguments.ThrowIfVersion();
             return commandArguments;
         }
@@ -137,8 +136,7 @@ namespace XmlComplex
                 return;
             }
 
-            Console.WriteLine(Resources.ErrorInvalidLineCode, Options["newline"]);
-            throw new InvalidCommandArgumentException();
+            throw new InvalidCommandArgumentException(string.Format(Resources.ErrorInvalidLineCode, Options["newline"]));
         }
 
         /// <summary>
@@ -152,6 +150,7 @@ namespace XmlComplex
             if (!HasEncodingOption && !ShowEncodings)
                 return;
 
+            string invalidEncodingMessage = null;
             if (HasEncodingOption)
             {
                 var encodingName = Options["encoding"];
@@ -161,23 +160,25 @@ namespace XmlComplex
                 }
                 catch (ArgumentException ex)
                 {
-                    Console.WriteLine(Resources.ErrorInvalidEncoding, encodingName, ex.Message);
-                    Console.WriteLine();
+                    invalidEncodingMessage = string.Format(Resources.ErrorInvalidEncoding, encodingName, ex.Message);
                 }
             }
 
             if (Encoding != null && !ShowEncodings)
                 return;
 
-            ShowEncodingsHelp();
+            var encodingsMessage = GetEncodingsHelpMessage();
             if (ShowEncodings)
-                throw new CommandArgumentSuccessException();
+                throw new CommandArgumentSuccessException(encodingsMessage);
 
-            throw new InvalidCommandArgumentException();
+            var message = string.IsNullOrEmpty(invalidEncodingMessage)
+                ? encodingsMessage
+                : string.Format("{0}{1}{1}{2}", invalidEncodingMessage, Environment.NewLine, encodingsMessage);
+            throw new InvalidCommandArgumentException(message);
         }
 
         /// <summary>
-        /// 必須引数の有無を検証し、不足時はヘルプを表示して例外を送出します。
+        /// 必須引数の有無を検証し、不足時はヘルプを含む例外を送出します。
         /// </summary>
         /// <exception cref="CommandArgumentSuccessException">ヘルプ表示指定で正常終了する場合。</exception>
         /// <exception cref="InvalidCommandArgumentException">必須引数が不足している場合。</exception>
@@ -186,11 +187,11 @@ namespace XmlComplex
             if (InputFiles.Count > 0 && HasOutput && !HasHelpOption)
                 return;
 
-            ShowHelp();
+            var helpMessage = GetHelpMessage();
             if (HasHelpOption)
-                throw new CommandArgumentSuccessException();
+                throw new CommandArgumentSuccessException(helpMessage);
 
-            throw new InvalidCommandArgumentException();
+            throw new InvalidCommandArgumentException(helpMessage);
         }
 
         /// <summary>
@@ -199,80 +200,80 @@ namespace XmlComplex
         /// <exception cref="MissingInputFileCommandArgumentException">入力ファイルが存在しない場合。</exception>
         private void EnsureAllInputFilesOrThrow()
         {
-            var hasAll = true;
-            foreach (var item in InputFiles.Where(w => !File.Exists(w)))
-            {
-                Console.WriteLine(string.Format(Resources.ErrorFileNotFound, item));
-                hasAll = false;
-            }
+            var missingFileMessages = InputFiles
+                .Where(w => !File.Exists(w))
+                .Select(w => string.Format(Resources.ErrorFileNotFound, w))
+                .ToArray();
 
-            if (!hasAll)
-                throw new MissingInputFileCommandArgumentException();
+            if (missingFileMessages.Length > 0)
+                throw new MissingInputFileCommandArgumentException(string.Join(Environment.NewLine, missingFileMessages));
         }
 
         /// <summary>
-        /// バージョン情報を表示します。
+        /// バージョン表示オプションが指定されている場合、バージョン情報を含む成功例外を送出します。
         /// </summary>
-        /// <exception cref="CommandArgumentSuccessException">成功</exception>
+        /// <exception cref="CommandArgumentSuccessException">バージョン表示で正常終了する場合。</exception>
         private void ThrowIfVersion()
         {
             if (!ShowVersion)
                 return;
 
-            ShowVersionMessage();
-            throw new CommandArgumentSuccessException();
+            throw new CommandArgumentSuccessException(GetVersionMessage());
         }
 
         /// <summary>
-        /// ヘルプ オプションが指定されている場合にヘルプを表示し、正常終了を通知する例外をスローします。
+        /// 利用可能なエンコーディング一覧メッセージを生成します。
         /// </summary>
-        /// <remarks>ヘルプ オプションが指定されていない場合は何も実行しません。</remarks>
-        /// <exception cref="CommandArgumentSuccessException">ヘルプ オプションが指定されている場合に、ヘルプ表示後の正常終了を通知するためにスローされます。</exception>
-        private void ThrowIfHelp ()
+        /// <returns>表示用のエンコーディング一覧メッセージ。</returns>
+        private static string GetEncodingsHelpMessage()
         {
-            if (!HasHelpOption)
-                return;
+            var builder = new StringBuilder();
+            builder.Append(Resources.HelpEncoding);
 
-            ShowHelp();
-            throw new CommandArgumentSuccessException();
-        }
-
-        /// <summary>
-        /// 利用可能なエンコーディング一覧を標準出力へ表示します。
-        /// </summary>
-        private void ShowEncodingsHelp()
-        {
-            Console.WriteLine(Resources.HelpEncoding);
             foreach (var enc in Encoding.GetEncodings().OrderBy(w => w.Name))
             {
-                Console.WriteLine("\t{0}\t{1}", enc.Name, enc.DisplayName);
+                builder.Append(Environment.NewLine);
+                builder.AppendFormat("\t{0}\t{1}", enc.Name, enc.DisplayName);
             }
-            Console.WriteLine("\t{0}", Resources.HelpEncodingExt);
+
+            builder.Append(Environment.NewLine);
+            builder.AppendFormat("\t{0}", Resources.HelpEncodingExt);
+            return builder.ToString();
         }
 
         /// <summary>
-        /// バージョン情報を標準出力へ表示します。
+        /// バージョン情報メッセージを生成します。
         /// </summary>
-        public void ShowVersionMessage()
+        /// <returns>表示用のバージョン情報メッセージ。</returns>
+        private static string GetVersionMessage()
         {
             var asm = Assembly.GetExecutingAssembly();
             var version = Attribute.GetCustomAttribute(asm, typeof(AssemblyFileVersionAttribute)) as AssemblyFileVersionAttribute;
-            Console.WriteLine(Resources.MessageVersion, Path.GetFileName(asm.Location), version?.Version);
+            return string.Format(Resources.MessageVersion, Path.GetFileName(asm.Location), version?.Version);
         }
 
         /// <summary>
-        /// アプリケーションのヘルプメッセージを標準出力へ表示します。
+        /// ヘルプメッセージを生成します。
         /// </summary>
-        public void ShowHelp()
+        /// <returns>表示用のヘルプメッセージ。</returns>
+        private string GetHelpMessage()
         {
             var asm = Assembly.GetExecutingAssembly();
             var copyright = Attribute.GetCustomAttribute(asm, typeof(AssemblyCopyrightAttribute)) as AssemblyCopyrightAttribute;
             var title = Attribute.GetCustomAttribute(asm, typeof(AssemblyTitleAttribute)) as AssemblyTitleAttribute;
-            Console.WriteLine("{0} ({1})", title?.Title, copyright?.Copyright);
-            var filename = Path.GetFileName(asm.Location);
-            Console.WriteLine(Resources.HelpMessage, filename, Resources.HelpEncodingExt, string.Join("|", Enum.GetNames(typeof(NewLineKind))));
-            foreach (var line in optionHelper.GetHelp())
-                Console.WriteLine(line);
+
+            var builder = new StringBuilder();
+            builder.AppendFormat("{0} ({1})", title?.Title, copyright?.Copyright);
+            builder.Append(Environment.NewLine);
+            builder.AppendFormat(Resources.HelpMessage, Path.GetFileName(asm.Location), Resources.HelpEncodingExt, string.Join("|", Enum.GetNames(typeof(NewLineKind))));
+
+            foreach (var helpLine in optionHelper.GetHelp())
+            {
+                builder.Append(Environment.NewLine);
+                builder.Append(helpLine);
+            }
+
+            return builder.ToString();
         }
     }
 }
