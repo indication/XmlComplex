@@ -1,0 +1,49 @@
+name: Tag on Release PR Merge
+
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    if: ${{ github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'release/v') }}
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Resolve tag from branch name
+        id: resolve
+        shell: pwsh
+        run: |
+          $branch = "${{ github.event.pull_request.head.ref }}"
+          $tag = $branch -replace '^release/', ''
+
+          if ($tag -notmatch '^v\d+\.\d+\.\d+([-.][0-9A-Za-z.-]+)?$') {
+            throw "Invalid release branch format. Use release/vX.Y.Z or release/vX.Y.Z-suffix. Actual: $branch"
+          }
+
+          "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Create and push tag
+        shell: pwsh
+        run: |
+          $tag = "${{ steps.resolve.outputs.tag }}"
+          $mergeSha = "${{ github.event.pull_request.merge_commit_sha }}"
+
+          git fetch --tags
+          if (git rev-parse "refs/tags/$tag" 2>$null) {
+            throw "Tag already exists: $tag"
+          }
+
+          git tag -a $tag $mergeSha -m "Release $tag"
+          git push origin $tag
