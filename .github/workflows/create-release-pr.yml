@@ -22,10 +22,13 @@ jobs:
     steps:
       - name: Create or reuse release PR
         uses: actions/github-script@v8
+        env:
+          RELEASE_BRANCH: ${{ github.event.inputs.release_branch }}
+          BASE_BRANCH: ${{ github.event.inputs.base_branch }}
         with:
           script: |
-            const releaseBranch = core.getInput('release_branch').trim();
-            const baseBranch = core.getInput('base_branch').trim();
+            const releaseBranch = process.env.RELEASE_BRANCH.trim();
+            const baseBranch = process.env.BASE_BRANCH.trim();
 
             if (!releaseBranch.startsWith('release/v')) {
               core.setFailed(`release_branch must start with 'release/v'. actual: ${releaseBranch}`);
