@@ -49,7 +49,11 @@ jobs:
               echo "Expected one ${attribute} attribute; found ${count}." >&2
               exit 1
             fi
-            sed -i -E "s/^(\[assembly: ${attribute}\(\")[^\"]+(\"\)\])$/\1${assembly_version}\2/" "$assembly_info"
+            sed -i -E "s|^(\\[assembly: ${attribute}\\(\")[^\"]+(\"\\)\\]\s*)$|\1${assembly_version}\2|" "$assembly_info"
+            if ! grep -Fq "[assembly: ${attribute}(\"${assembly_version}\")]" "$assembly_info"; then
+              echo "Failed to set ${attribute} to ${assembly_version}." >&2
+              exit 1
+            fi
           done
 
           git config user.name "github-actions[bot]"
