@@ -3,16 +3,13 @@ name: Create Release PR
 on:
   workflow_dispatch:
     inputs:
-      release_branch:
-        description: 'Release branch name (e.g. release/v1.2.3)'
+      version:
+        description: 'Release version (e.g. 1.2.3)'
         required: true
-      base_branch:
-        description: 'Base branch to merge into'
-        required: true
-        default: 'main'
+        type: string
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
 
 jobs:
@@ -20,66 +17,55 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Create or reuse release PR
-        uses: actions/github-script@v8
+      - name: Validate version
         env:
-          RELEASE_BRANCH: ${{ github.event.inputs.release_branch }}
-          BASE_BRANCH: ${{ github.event.inputs.base_branch }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Version must use X.Y.Z format. Actual: $VERSION" >&2
+            exit 1
+          fi
+
+      - name: Checkout base branch
+        uses: actions/checkout@v7
         with:
-          script: |
-            const releaseBranch = process.env.RELEASE_BRANCH.trim();
-            const baseBranch = process.env.BASE_BRANCH.trim();
+          ref: main
+          fetch-depth: 0
 
-            if (!releaseBranch.startsWith('release/v')) {
-              core.setFailed(`release_branch must start with 'release/v'. actual: ${releaseBranch}`);
-              return;
-            }
+      - name: Create release branch and update application version
+        id: release
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          build_number=$(date +%s)
+          echo "build_number=$build_number" >> "$GITHUB_OUTPUT"
+          release_branch="release/v${VERSION}.${build_number}"
+          git switch --create "$release_branch"
+          assembly_version="${VERSION}.${build_number}"
+          assembly_info="App/Properties/AssemblyInfo.cs"
+          for attribute in AssemblyVersion AssemblyFileVersion; do
+            count=$(grep -c "^\[assembly: ${attribute}(\"" "$assembly_info")
+            if [[ "$count" -ne 1 ]]; then
+              echo "Expected one ${attribute} attribute; found ${count}." >&2
+              exit 1
+            fi
+            sed -i -E "s/^(\[assembly: ${attribute}\(\")[^\"]+(\"\)\])$/\1${assembly_version}\2/" "$assembly_info"
+          done
 
-            const head = `${context.repo.owner}:${releaseBranch}`;
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add App/Properties/AssemblyInfo.cs
+          git commit -m "chore(release): bump assembly version to v${VERSION}.${build_number}"
+          git push --set-upstream origin "$release_branch"
 
-            const existing = await github.rest.pulls.list({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              head,
-              base: baseBranch
-            });
-
-            if (existing.data.length > 0) {
-              const pr = existing.data[0];
-              core.notice(`Open PR already exists: #${pr.number} ${pr.html_url}`);
-              core.setOutput('pull_request_url', pr.html_url);
-              return;
-            }
-
-            const compare = await github.rest.repos.compareCommitsWithBasehead({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              basehead: `${baseBranch}...${releaseBranch}`
-            });
-
-            if (compare.data.total_commits === 0) {
-              core.setFailed(`No differences found between ${baseBranch} and ${releaseBranch}.`);
-              return;
-            }
-
-            const version = releaseBranch.replace(/^release\//, '');
-
-            const created = await github.rest.pulls.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: `Release ${version}`,
-              head: releaseBranch,
-              base: baseBranch,
-              body: [
-                '## Release PR',
-                '',
-                `- Source branch: ${releaseBranch}`,
-                `- Target branch: ${baseBranch}`,
-                '',
-                'Merged PR will trigger the tag workflow.'
-              ].join('\n')
-            });
-
-            core.notice(`Created PR: #${created.data.number} ${created.data.html_url}`);
-            core.setOutput('pull_request_url', created.data.html_url);
+      - name: Create release PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+          BUILD_NUMBER: ${{ steps.release.outputs.build_number }}
+        run: |
+          gh pr create \
+            --base main \
+            --head "release/v${VERSION}.${BUILD_NUMBER}" \
+            --title "Release v${VERSION}.${BUILD_NUMBER}" \
+            --body $'## Release PR\n\n- Source branch: release/v'"${VERSION}.${BUILD_NUMBER}"$'\n- Target branch: main\n\nMerged PR will trigger the tag workflow.'
